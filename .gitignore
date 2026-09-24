@@ -1,0 +1,39 @@
+# Node / frontend
+node_modules/
+frontend/frontend/node_modules/
+frontend/frontend/dist/
+frontend/frontend/build/
+frontend/frontend/.vite/
+
+# Python / backend
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+venv/
+.venv/
+env/
+.env
+.env.*
+*.log
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# OS generated
+Desktop.ini
+
+# Project-specific uploads / generated data
+backend/backend/uploads/
+backend/backend/*.json
+!backend/backend/knowledge_base.json
+
+# Local config and secrets
+*.pem
+*.key
+*.crt
