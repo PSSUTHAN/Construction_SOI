@@ -278,33 +278,17 @@ init_db()
 
 
 
-def get_frontend_dist():
-    candidates = [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'construct', 'dist')),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'dist')),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist')),
-    ]
-    for c in candidates:
-        if os.path.exists(os.path.join(c, 'index.html')):
-            return c
-    return candidates[0]
-
-
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve_frontend(path):
-    """Serve built frontend static assets and SPA routes, preserving API/upload routes."""
-    if path.startswith('api') or path.startswith('uploads'):
-        return jsonify({"error": "API route not found"}), 404
-    dist_dir = get_frontend_dist()
-    if path and os.path.exists(os.path.join(dist_dir, path)):
-        return send_from_directory(dist_dir, path)
+@app.route('/')
+def serve_index():
+    """Serve the main website from the React build folder."""
+    dist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
     if os.path.exists(os.path.join(dist_dir, 'index.html')):
         return send_from_directory(dist_dir, 'index.html')
-    return jsonify({
-        "status": "pending",
-        "message": "Frontend not built yet. Run 'npm run build' in the frontend directory."
-    })
+    else:
+        return jsonify({
+            "status": "pending",
+            "message": "Frontend not built yet. Run 'npm run build' in the frontend directory."
+        })
 
 
 @app.route('/uploads/<path:filename>')
