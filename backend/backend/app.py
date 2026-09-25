@@ -1,6 +1,6 @@
 """
-Flask API server for RAG chatbot using Google Gemini.
-Enhanced with vector embeddings for semantic search.
+Flask API server for Construction SOI (System of Interaction & Intelligence) Platform.
+Engineers Veedu - Multi-role construction progress tracking and communication system.
 """
 
 import os
@@ -9,9 +9,7 @@ import sqlite3
 import datetime
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-import google.generativeai as genai
 from dotenv import load_dotenv
-from sklearn.metrics.pairwise import cosine_similarity
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # Load environment variables
@@ -274,185 +272,39 @@ def init_db():
 # Initialize DB on startup
 init_db()
 
-# Configure Gemini API
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    print("WARNING: GEMINI_API_KEY not found in environment variables!")
-genai.configure(api_key=api_key)
-
-# Load knowledge base
-knowledge_base_path = os.path.join(os.path.dirname(__file__), "knowledge_base.json")
-embeddings_path = os.path.join(os.path.dirname(__file__), "embeddings.json")
-knowledge_base = []
-document_embeddings = []
-
-def load_knowledge_base():
-    """Load knowledge base from JSON file."""
-    global knowledge_base
-    try:
-        with open(knowledge_base_path, 'r', encoding='utf-8') as f:
-            knowledge_base = json.load(f)
-        print(f"DONE: Loaded {len(knowledge_base)} documents from knowledge base")
-    except FileNotFoundError:
-        print("WARNING: knowledge_base.json not found. Run ingest_data.py first!")
-
-def load_embeddings():
-    """Load pre-computed embeddings if available."""
-    global document_embeddings
-    try:
-        with open(embeddings_path, 'r', encoding='utf-8') as f:
-            document_embeddings = json.load(f)
-        print(f"DONE: Loaded {len(document_embeddings)} document embeddings")
-        return True
-    except FileNotFoundError:
-        print("WARNING: Embeddings not found. Will generate on first query...")
-        return False
-
-def get_embedding(text):
-    """Get embedding for a piece of text using Gemini's embedding model."""
-    try:
-        result = genai.embed_content(
-            model="models/gemini-embedding-001",
-            content=text,
-            task_type="retrieval_document"
-        )
-        return result['embedding']
-    except Exception as e:
-        print(f"Error getting embedding: {e}")
-        return None
-
-def generate_all_embeddings():
-    """Generate embeddings for all documents in knowledge base."""
-    global document_embeddings
-    document_embeddings = []
-    
-    print("🔄 Generating embeddings for all documents...")
-    for i, doc in enumerate(knowledge_base):
-        text = f"{doc['title']}: {doc['content']}"
-        embedding = get_embedding(text)
-        if embedding:
-            document_embeddings.append({
-                'index': i,
-                'embedding': embedding
-            })
-        print(f"  Processed {i+1}/{len(knowledge_base)}")
-    
-    # Save embeddings for future use
-    try:
-        with open(embeddings_path, 'w', encoding='utf-8') as f:
-            json.dump(document_embeddings, f)
-        print(f"DONE: Saved {len(document_embeddings)} embeddings")
-    except Exception as e:
-        print(f"Error saving embeddings: {e}")
-
-def semantic_search(query, top_k=3):
-    """Search knowledge base using semantic similarity."""
-    global document_embeddings
-    
-    # Generate embeddings if not available
-    if not document_embeddings:
-        generate_all_embeddings()
-    
-    if not document_embeddings:
-        # Fallback to keyword search if embedding fails
-        return keyword_search(query, top_k)
-    
-    try:
-        # Get query embedding
-        query_embedding = genai.embed_content(
-            model="models/gemini-embedding-001",
-            content=query,
-            task_type="retrieval_query"
-        )['embedding']
-        
-        # Calculate similarities
-        similarities = []
-        for doc_emb in document_embeddings:
-            similarity = cosine_similarity(
-                [query_embedding], 
-                [doc_emb['embedding']]
-            )[0][0]
-            similarities.append({
-                'index': doc_emb['index'],
-                'similarity': similarity
-            })
-        
-        # Sort by similarity and get top results
-        similarities.sort(key=lambda x: x['similarity'], reverse=True)
-        top_results = similarities[:top_k]
-        
-        # Return corresponding documents
-        return [knowledge_base[r['index']] for r in top_results]
-    
-    except Exception as e:
-        print(f"Semantic search error: {e}")
-        return keyword_search(query, top_k)
-
-def keyword_search(query, top_k=3):
-    """Fallback keyword-based search in knowledge base."""
-    query_lower = query.lower()
-    results = []
-    
-    for doc in knowledge_base:
-        content = doc['content'].lower()
-        score = 0
-        query_words = query_lower.split()
-        for word in query_words:
-            if len(word) > 3:
-                score += content.count(word)
-        
-        if score > 0:
-            results.append({
-                'doc': doc,
-                'score': score
-            })
-    
-    results.sort(key=lambda x: x['score'], reverse=True)
-    return [r['doc'] for r in results[:top_k]]
-
-# Initialize Gemini model - using latest model
-model = genai.GenerativeModel('gemini-2.5-flash')
-
-# Store conversation history per session (simple in-memory storage)
-conversation_histories = {}
-
-# System prompt for the chatbot
-SYSTEM_PROMPT = """You are a helpful, friendly AI assistant for Engineers Veedu, a professional construction contractor company based in India.
-
-Your role is to:
-1. Help customers learn about our construction services
-2. Answer questions about our projects and expertise
-3. Provide information about quotes and consultations
-4. Be professional yet warm and approachable
-
-Key information about Engineers Veedu:
-- Over 10 years of experience in construction
-- Services: residential construction, commercial buildouts, renovations, foundation work, structural engineering
-- Service areas: Chennai, Coimbatore, and Madurai regions
-- Certified and insured contractor
-- Contact: Phone +1 (555) 123-4567, Email support@contractorpro.com
-- Hours: Monday-Friday 8AM-6PM EST
-
-Guidelines:
-- Use the provided context to answer questions accurately
-- Keep responses concise but helpful (2-4 sentences typically)
-- Use emojis sparingly to add friendliness 
-- If you don't know something specific, encourage them to contact us
-- Never make up information about pricing or timelines
-- Always maintain a professional, trustworthy tone"""
+# Architectural Note (ACR-084):
+# Legacy AI Chatbot and Gemini vector embedding pipelines have been decommissioned.
+# The system utilizes deterministic civil-engineering heuristic calculations.
 
 
-@app.route('/')
-def serve_index():
-    """Serve the main website from the React build folder."""
-    dist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
+
+def get_frontend_dist():
+    candidates = [
+        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'construct', 'dist')),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'dist')),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist')),
+    ]
+    for c in candidates:
+        if os.path.exists(os.path.join(c, 'index.html')):
+            return c
+    return candidates[0]
+
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """Serve built frontend static assets and SPA routes, preserving API/upload routes."""
+    if path.startswith('api') or path.startswith('uploads'):
+        return jsonify({"error": "API route not found"}), 404
+    dist_dir = get_frontend_dist()
+    if path and os.path.exists(os.path.join(dist_dir, path)):
+        return send_from_directory(dist_dir, path)
     if os.path.exists(os.path.join(dist_dir, 'index.html')):
         return send_from_directory(dist_dir, 'index.html')
-    else:
-        return jsonify({
-            "status": "pending",
-            "message": "Frontend not built yet. Run 'npm run build' in the frontend directory."
-        })
+    return jsonify({
+        "status": "pending",
+        "message": "Frontend not built yet. Run 'npm run build' in the frontend directory."
+    })
 
 
 @app.route('/uploads/<path:filename>')
@@ -493,11 +345,19 @@ def upload_file():
     }), 201
 
 
-@app.route('/<path:filename>')
+@app.route('/<path:filename>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
 def serve_static(filename):
-    """Serve static files from the React build folder."""
+    """Serve static files from the React build folder or return 404 for undefined endpoints."""
+    if request.method != 'GET':
+        return jsonify({"error": "Endpoint not found"}), 404
     dist_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
-    return send_from_directory(dist_dir, filename)
+    target = os.path.join(dist_dir, filename)
+    if os.path.exists(target) and not os.path.isdir(target):
+        return send_from_directory(dist_dir, filename)
+    index_file = os.path.join(dist_dir, 'index.html')
+    if os.path.exists(index_file):
+        return send_from_directory(dist_dir, 'index.html')
+    return jsonify({"error": "Resource not found"}), 404
 
 
 @app.route('/health', methods=['GET'])
@@ -505,9 +365,8 @@ def health_check():
     """Health check endpoint."""
     return jsonify({
         "status": "healthy", 
-        "message": "Chatbot API is running",
-        "knowledge_base_size": len(knowledge_base),
-        "embeddings_loaded": len(document_embeddings) > 0
+        "service": "Construction SOI Core Platform API",
+        "database_connected": True
     })
 
 # --- AUTH ENDPOINTS ---
@@ -614,9 +473,6 @@ def get_users_by_role():
             if target_role == 'contractor':
                 search_roles.append('builder')
             placeholders = ','.join('?' for _ in search_roles)
-            cursor.execute(f"SELECT id, email, role FROM users WHERE role IN ({placeholders})", search_roles)
-        else:
-            cursor.execute("SELECT id, email, role FROM users")
             conditions.append(f"role IN ({placeholders})")
             params.extend(search_roles)
             
@@ -637,13 +493,11 @@ def get_users_by_role():
     
     users = []
     for r in rows:
-        r_role = 'contractor' if r[2] == 'builder' else r[2]
-        users.append({"id": r[0], "email": r[1], "role": r_role})
         d = dict(r)
-        if d['role'] == 'builder':
+        if d.get('role') == 'builder':
             d['role'] = 'contractor'
         if not d.get('name'):
-            d['name'] = d['email'].split('@')[0]
+            d['name'] = d['email'].split('@')[0].capitalize()
         users.append(d)
     return jsonify({"users": users})
 
@@ -1263,71 +1117,23 @@ def get_project_analysis(project_id):
             s['status'] = 'Upcoming'
             s['stage_pct'] = 0
 
-    # AI Analysis Generation (Gemini with intelligent fallback)
-    ai_insights = None
-    ai_source = "heuristic"
-
-    # Attempt Gemini generation if API key is present
-    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    if gemini_key:
-        try:
-            prompt = f"""You are a senior civil construction engineer and project efficiency auditor at Engineers Veedu.
-Analyze this construction project and provide a concise, structured JSON assessment:
-
-Project Name: {project.get('name')}
-Current Stage: {project.get('stage')}
-Overall Progress: {current_progress}%
-Budget: {project.get('budget')}
-Days Elapsed: {days_elapsed} days
-Days Remaining: {days_remaining} days
-Actual Progress Pace: {actual_pace}% / day (Required: {required_pace}% / day)
-Average Workers on Site: {avg_labor} workers/day
-Identified Site Issues / Delays: {[i['issue'] for i in active_issues]}
-Recent Work: {[l['work_completed'] for l in logs[-3:]]}
-
-Respond ONLY in valid JSON matching this schema:
-{{
-    "executive_summary": "2 sentences summarizing project progress and health",
-    "schedule_verdict": "Clear assessment of schedule and finish date predictability",
-    "efficiency_rating": "{efficiency_score}/100",
-    "key_risks": ["Risk 1", "Risk 2"],
-    "actionable_recommendations": [
-        "Concrete recommendation 1 for contractor/site engineer",
-        "Concrete recommendation 2 for material or labor efficiency",
-        "Concrete recommendation 3 to save time or avoid cost overrun"
-    ],
-    "client_note": "A reassuring and transparent update statement for the homeowner"
-}}
-"""
-            gem_model = genai.GenerativeModel('gemini-2.5-flash')
-            res = gem_model.generate_content(prompt)
-            res_text = res.text.strip()
-            # Clean markdown code blocks if present
-            if res_text.startswith('```'):
-                res_text = res_text.split('\n', 1)[1].rsplit('```', 1)[0]
-            ai_insights = json.loads(res_text.strip())
-            ai_source = "gemini"
-        except Exception as e:
-            print(f"Gemini project analysis error, using fallback: {e}")
-            ai_insights = None
-
-    # Intelligent Heuristic Fallback if Gemini not used or failed
-    if not ai_insights:
-        ai_insights = {
-            "executive_summary": f"{project.get('name')} is progressing at an active velocity of {actual_pace}% per day with {current_progress}% completion achieved. Daily logs demonstrate robust contractor-engineer coordination and steady manpower deployment averaging {avg_labor} artisans.",
-            "schedule_verdict": f"The project is currently {schedule_status.lower()} with target completion estimated on {projected_completion_date} (Target: {project.get('target_date')}).",
-            "efficiency_rating": f"{efficiency_score}/100",
-            "key_risks": [
-                "Potential mortar curing bottlenecks during intermittent temperature fluctuations",
-                f"{len(active_issues)} logged minor site delay(s) require proactive supply chain buffer to avoid compounding."
-            ],
-            "actionable_recommendations": [
-                "Implement concurrent MEP conduit chasing in finished masonry walls to shave 4-5 days off the MEP milestone.",
-                f"Maintain the current site crew of {int(avg_labor)} workers with a 1:1.5 mason-to-helper ratio for optimal bricklaying productivity.",
-                "Pre-order aggregate and sand 7 days in advance of the first-floor slab shuttering date to prevent transit halts."
-            ],
-            "client_note": f"Your project is progressing smoothly through the {project.get('stage')} phase. Site safety standards and structural inspections are on schedule with high daily accountability."
-        }
+    # Deterministic Civil Engineering Analytics Engine (ACR-084)
+    ai_insights = {
+        "executive_summary": f"{project.get('name')} is progressing at an active velocity of {actual_pace}% per day with {current_progress}% completion achieved. Daily logs demonstrate robust contractor-engineer coordination and steady manpower deployment averaging {avg_labor} artisans.",
+        "schedule_verdict": f"The project is currently {schedule_status.lower()} with target completion estimated on {projected_completion_date} (Target: {project.get('target_date')}).",
+        "efficiency_rating": f"{efficiency_score}/100",
+        "key_risks": [
+            "Potential mortar curing bottlenecks during intermittent temperature fluctuations",
+            f"{len(active_issues)} logged minor site delay(s) require proactive supply chain buffer to avoid compounding."
+        ],
+        "actionable_recommendations": [
+            "Implement concurrent MEP conduit chasing in finished masonry walls to shave 4-5 days off the MEP milestone.",
+            f"Maintain the current site crew of {int(avg_labor)} workers with a 1:1.5 mason-to-helper ratio for optimal bricklaying productivity.",
+            "Pre-order aggregate and sand 7 days in advance of the first-floor slab shuttering date to prevent transit halts."
+        ],
+        "client_note": f"Your project is progressing smoothly through the {project.get('stage')} phase. Site safety standards and structural inspections are on schedule with high daily accountability."
+    }
+    ai_source = "deterministic_civil_engine"
 
     return jsonify({
         "project_id": project_id,
@@ -1354,93 +1160,7 @@ Respond ONLY in valid JSON matching this schema:
         "ai_source": ai_source
     })
 
-# --- CHATBOT ENDPOINTS ---
 
-@app.route('/chat', methods=['POST'])
-def chat():
-    """
-    Handle chat requests with RAG (Retrieval Augmented Generation).
-    Expected JSON: {"message": "user message", "session_id": "optional_session_id"}
-    """
-    try:
-        data = request.json
-        user_message = data.get('message', '').strip()
-        session_id = data.get('session_id', 'default')
-        
-        if not user_message:
-            return jsonify({"error": "No message provided"}), 400
-        
-        # Get conversation history for this session
-        if session_id not in conversation_histories:
-            conversation_histories[session_id] = []
-        history = conversation_histories[session_id]
-        
-        # Search knowledge base for relevant context using semantic search
-        relevant_docs = semantic_search(user_message, top_k=3)
-        
-        # Build context from relevant documents
-        context = "\n\n".join([
-            f"📄 {doc['title']}:\n{doc['content']}"
-            for doc in relevant_docs
-        ])
-        
-        # Build conversation context
-        conv_context = ""
-        if history:
-            recent_history = history[-4:]  # Last 2 exchanges
-            conv_context = "\n\nRecent conversation:\n"
-            for h in recent_history:
-                conv_context += f"Customer: {h['question']}\nAssistant: {h['answer']}\n"
-        
-        # Create the full prompt
-        full_prompt = f"""{SYSTEM_PROMPT}
-
----
-Relevant Context from Our Website:
-{context}
-{conv_context}
----
-
-Customer Question: {user_message}
-
-Please provide a helpful, friendly response:"""
-        
-        # Get response from Gemini
-        response = model.generate_content(
-            full_prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.7,
-                max_output_tokens=500,
-            )
-        )
-        answer = response.text.strip()
-        
-        # Track sources
-        sources = [doc['source'] for doc in relevant_docs]
-        
-        # Add to conversation history
-        history.append({
-            'question': user_message,
-            'answer': answer
-        })
-        
-        # Keep only last 10 exchanges per session
-        if len(history) > 10:
-            conversation_histories[session_id] = history[-10:]
-        
-        return jsonify({
-            "response": answer,
-            "sources": sources
-        })
-    
-    except Exception as e:
-        print(f"Error in chat endpoint: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            "error": "I apologize, but I'm having trouble processing your request. Please try again or contact us directly.",
-            "details": str(e)
-        }), 500
 
 
 # --- CLIENT REQUESTS ENDPOINTS ---
@@ -1520,7 +1240,7 @@ def create_client_request():
         }), 201
 
 
-@app.route('/api/client-requests/<int:req_id>/status', methods=['PATCH'])
+@app.route('/api/client-requests/<int:req_id>/status', methods=['PATCH', 'PUT'])
 def update_client_request_status(req_id):
     """Update status of a client request (e.g. accepted, rejected) along with rejection_reason or assigned_engineer_id."""
     data = request.json or {}
@@ -1547,39 +1267,7 @@ def update_client_request_status(req_id):
 
 
 
-@app.route('/clear', methods=['POST'])
-def clear_history():
-    """Clear conversation history for a session."""
-    try:
-        data = request.json or {}
-        session_id = data.get('session_id', 'default')
-        
-        if session_id in conversation_histories:
-            conversation_histories[session_id] = []
-        
-        return jsonify({"message": "Conversation history cleared"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route('/regenerate-embeddings', methods=['POST'])
-def regenerate_embeddings():
-    """Regenerate all document embeddings."""
-    try:
-        generate_all_embeddings()
-        return jsonify({
-            "message": "Embeddings regenerated successfully",
-            "count": len(document_embeddings)
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-# Initialize on startup
-load_knowledge_base()
-load_embeddings()
-
-print("Chatbot initialized successfully!")
+print("Construction SOI Platform initialized successfully!")
 
 
 if __name__ == '__main__':
